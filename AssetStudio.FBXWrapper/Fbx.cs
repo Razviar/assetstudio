@@ -7,6 +7,7 @@ namespace AssetStudio
 {
     public static partial class Fbx
     {
+        private static readonly object ExportLock = new object();
 
         static Fbx()
         {
@@ -29,26 +30,34 @@ namespace AssetStudio
         {
             public static void Export(string path, IImported imported, ExportOptions exportOptions)
             {
-                var file = new FileInfo(path);
-                var dir = file.Directory;
-
-                if (!dir.Exists)
+                lock (ExportLock)
                 {
-                    dir.Create();
+                    var file = new FileInfo(path);
+                    var dir = file.Directory;
+
+                    if (!dir.Exists)
+                    {
+                        dir.Create();
+                    }
+
+                    var currentDir = Directory.GetCurrentDirectory();
+                    try
+                    {
+                        Directory.SetCurrentDirectory(dir.FullName);
+
+                        var name = Path.GetFileName(path);
+
+                        using (var exporter = new FbxExporter(name, imported, exportOptions))
+                        {
+                            exporter.Initialize();
+                            exporter.ExportAll();
+                        }
+                    }
+                    finally
+                    {
+                        Directory.SetCurrentDirectory(currentDir);
+                    }
                 }
-
-                var currentDir = Directory.GetCurrentDirectory();
-                Directory.SetCurrentDirectory(dir.FullName);
-
-                var name = Path.GetFileName(path);
-
-                using (var exporter = new FbxExporter(name, imported, exportOptions))
-                {
-                    exporter.Initialize();
-                    exporter.ExportAll();
-                }
-
-                Directory.SetCurrentDirectory(currentDir);
             }
         }
 
